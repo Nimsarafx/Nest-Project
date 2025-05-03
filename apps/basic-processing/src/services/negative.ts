@@ -2,7 +2,6 @@
 import { Injectable } from '@nestjs/common';
 import * as sharp from 'sharp';
 import { MessagePattern } from '@nestjs/microservices';
-import { applyConvolution } from '../../../common/utils/convolution';
 import * as fs from 'fs';
 import * as path from 'path';
 
