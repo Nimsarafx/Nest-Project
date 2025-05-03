@@ -10,40 +10,44 @@ export class RotateService {
     inputBuffer: Buffer,
     width: number,
     height: number,
-    angle: number
-  ): Buffer {
-    const channels = 3;
-    const outputBuffer = Buffer.alloc(width * height * channels);
+    angle: number,
+    channels: number
+  ): { buffer: Buffer; newWidth: number; newHeight: number } {
+    const radians = (angle * Math.PI) / 180;
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
 
-    const radian = angle * (Math.PI / 180);
-    const cos = Math.cos(radian);
-    const sin = Math.sin(radian);
-    const centerX = width / 2;
-    const centerY = height / 2;
+    // Calculate new dimensions
+    const newWidth = Math.ceil(Math.abs(width * cos) + Math.abs(height * sin));
+    const newHeight = Math.ceil(Math.abs(width * sin) + Math.abs(height * cos));
+    const outputBuffer = Buffer.alloc(newWidth * newHeight * channels, 0); // filled with black
 
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const dx = x - centerX;
-        const dy = y - centerY;
+    const cx = width / 2;
+    const cy = height / 2;
+    const ncx = newWidth / 2;
+    const ncy = newHeight / 2;
 
-        const rotatedX = Math.round(dx * cos - dy * sin + centerX);
-        const rotatedY = Math.round(dx * sin + dy * cos + centerY);
+    for (let y = 0; y < newHeight; y++) {
+      for (let x = 0; x < newWidth; x++) {
+        // Map target → source
+        const dx = x - ncx;
+        const dy = y - ncy;
 
-        if (
-          rotatedX >= 0 && rotatedX < width &&
-          rotatedY >= 0 && rotatedY < height
-        ) {
-          const sourceIndex = (y * width + x) * channels;
-          const targetIndex = (rotatedY * width + rotatedX) * channels;
+        const srcX = Math.round(dx * cos + dy * sin + cx);
+        const srcY = Math.round(-dx * sin + dy * cos + cy);
+
+        if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
+          const srcIndex = (srcY * width + srcX) * channels;
+          const dstIndex = (y * newWidth + x) * channels;
 
           for (let c = 0; c < channels; c++) {
-            outputBuffer[targetIndex + c] = inputBuffer[sourceIndex + c];
+            outputBuffer[dstIndex + c] = inputBuffer[srcIndex + c];
           }
         }
       }
     }
 
-    return outputBuffer;
+    return { buffer: outputBuffer, newWidth, newHeight };
   }
 
   @MessagePattern({ cmd: 'rotate_image' })
@@ -65,7 +69,7 @@ export class RotateService {
 
       const image = sharp(imagePath);
       const metadata = await image.metadata();
-      const { width, height, channels } = metadata;
+      const { width, height, channels = 3 } = metadata;
 
       if (!width || !height || !channels) {
         throw new Error('Invalid image metadata');
@@ -73,14 +77,20 @@ export class RotateService {
 
       const rawData = await image.raw().toBuffer();
 
-      const rotatedBuffer = this.rotatePixels(rawData, width, height, angle);
+      const { buffer: rotatedBuffer, newWidth, newHeight } = this.rotatePixels(
+        rawData,
+        width,
+        height,
+        angle,
+        channels
+      );
 
       await sharp(rotatedBuffer, {
         raw: {
-          width,
-          height,
+          width: newWidth,
+          height: newHeight,
           channels,
-        }
+        },
       })
         .png()
         .toFile(outputFilePath);
