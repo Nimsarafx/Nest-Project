@@ -8,9 +8,6 @@ import * as path from 'path';
 
 @Injectable()
 export class NegativeService {
-  // Kernel for negative effect
-  private readonly kernel = [];
-
   @MessagePattern({ cmd: 'create_negative' })
   async createNegative(imagePath: string) {
     try {
@@ -28,26 +25,30 @@ export class NegativeService {
 
       const image = sharp(imagePath);
       const metadata = await image.metadata();
-      const { width, height } = metadata;
-      let channels;
+      const { width, height, channels } = metadata;
+
+      if (!width || !height || !channels) {
+        throw new Error('Invalid image metadata');
+      }
 
       const rawData = await image.raw().toBuffer();
 
-      const negativeBuffer = applyConvolution(rawData, width!, height!, channels, this.kernel.toSorted());
+      // Invert each channel manually (simple negative effect)
+      const negativeBuffer = Buffer.from(rawData.map(value => 255 - value));
 
       await sharp(negativeBuffer, {
         raw: {
-          width: width!,
-          height: height!,
-          channels: 2
-        }
+          width,
+          height,
+          channels,
+        },
       })
         .png()
         .toFile(outputFilePath);
 
       return {
         success: true,
-        message: 'Negative image created using convolution method',
+        message: 'Negative image created',
         savedImagePath: outputFilePath,
       };
     } catch (error) {
