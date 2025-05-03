@@ -1,10 +1,8 @@
-/* eslint-disable prettier/prettier */
 import { Injectable } from '@nestjs/common';
 import * as sharp from 'sharp';
 import { MessagePattern } from '@nestjs/microservices';
 import * as fs from 'fs';
 import * as path from 'path';
-
 
 @Injectable()
 export class NegativeService {
@@ -24,16 +22,26 @@ export class NegativeService {
       }
 
       const image = sharp(imagePath);
-      const { width, height, channels } = await image.metadata();
+      const metadata = await image.metadata();
+      const { width, height, channels } = metadata;
 
       if (!width || !height || !channels) {
         throw new Error('Invalid image metadata');
       }
 
       const rawData = await image.raw().toBuffer();
+      const negativeBuffer = Buffer.alloc(rawData.length);
 
-      // Manually invert each pixel value
-      const negativeBuffer = Buffer.from(rawData.map((val) => 255 - val));
+      for (let i = 0; i < rawData.length; i += channels) {
+        // Invert RGB, preserve Alpha if present
+        negativeBuffer[i] = 255 - rawData[i];     // Red
+        negativeBuffer[i + 1] = 255 - rawData[i + 1]; // Green
+        negativeBuffer[i + 2] = 255 - rawData[i + 2]; // Blue
+
+        if (channels === 4) {
+          negativeBuffer[i + 3] = rawData[i + 3]; // Preserve Alpha
+        }
+      }
 
       await sharp(negativeBuffer, {
         raw: {
