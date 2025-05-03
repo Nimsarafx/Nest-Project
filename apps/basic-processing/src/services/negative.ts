@@ -6,6 +6,7 @@ import { applyConvolution } from '../../../common/utils/convolution';
 import * as fs from 'fs';
 import * as path from 'path';
 
+
 @Injectable()
 export class NegativeService {
   @MessagePattern({ cmd: 'create_negative' })
@@ -24,8 +25,7 @@ export class NegativeService {
       }
 
       const image = sharp(imagePath);
-      const metadata = await image.metadata();
-      const { width, height, channels } = metadata;
+      const { width, height, channels } = await image.metadata();
 
       if (!width || !height || !channels) {
         throw new Error('Invalid image metadata');
@@ -33,8 +33,8 @@ export class NegativeService {
 
       const rawData = await image.raw().toBuffer();
 
-      // Invert each channel manually (simple negative effect)
-      const negativeBuffer = Buffer.from(rawData.map(value => 255 - value));
+      // Manually invert each pixel value
+      const negativeBuffer = Buffer.from(rawData.map((val) => 255 - val));
 
       await sharp(negativeBuffer, {
         raw: {
@@ -48,7 +48,7 @@ export class NegativeService {
 
       return {
         success: true,
-        message: 'Negative image created',
+        message: 'Negative image created successfully',
         savedImagePath: outputFilePath,
       };
     } catch (error) {
