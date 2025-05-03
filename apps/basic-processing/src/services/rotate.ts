@@ -1,11 +1,50 @@
 import { Injectable } from '@nestjs/common';
+import * as sharp from 'sharp';
 import { MessagePattern } from '@nestjs/microservices';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as sharp from 'sharp';
 
 @Injectable()
 export class RotateService {
+  private rotatePixels(
+    inputBuffer: Buffer,
+    width: number,
+    height: number,
+    angle: number
+  ): Buffer {
+    const channels = 3; 
+    const outputBuffer = Buffer.alloc(width * height * channels);
+
+    const radians = (angle * Math.PI) / 180;
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+
+        const dx = x - centerX;
+        const dy = y - centerY;
+
+        const rotatedX = Math.round(dx * Math.cos(radians) - dy * Math.sin(radians) + centerX);
+        const rotatedY = Math.round(dx * Math.sin(radians) + dy * Math.cos(radians) + centerY);
+
+        if (
+          rotatedX >= 0 && rotatedX < width &&
+          rotatedY >= 0 && rotatedY < height
+        ) {
+          const sourceIndex = (y * width + x) * channels;
+          const targetIndex = (rotatedY * width + rotatedX) * channels;
+
+          for (let c = 0; c < channels; c++) {
+            outputBuffer[targetIndex + c] = inputBuffer[sourceIndex + c];
+          }
+        }
+      }
+    }
+
+    return outputBuffer;
+  }
+
   @MessagePattern({ cmd: 'rotate_image' })
   async rotate(data: { imagePath: string; angle: number }) {
     try {
@@ -23,9 +62,24 @@ export class RotateService {
         fs.mkdirSync(outputDir, { recursive: true });
       }
 
-      // Use sharp's built-in rotate function
-      await sharp(imagePath)
-        .rotate(angle) // ✅ rotates the image by angle (in degrees)
+      const image = sharp(imagePath);
+      const metadata = await image.metadata();
+      const { width, height, channels } = metadata;
+
+      if (!width || !height || !channels) {
+        throw new Error('Invalid image metadata');
+      }
+
+      const rawData = await image.raw().toBuffer();
+      const rotatedBuffer = this.rotatePixels(rawData, width, height, angle);
+
+      await sharp(rotatedBuffer, {
+        raw: {
+          width,
+          height,
+          channels
+        }
+      })
         .png()
         .toFile(outputFilePath);
 
