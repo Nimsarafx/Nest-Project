@@ -6,10 +6,10 @@ import * as path from 'path';
 
 @Injectable()
 export class SharpenService {
-  // Do not change the this kernel
+  // Do not change this kernel
   private readonly strongKernel = [
     [-1, -1, -1],
-    [-1, 9, -1],
+    [-1,  9, -1],
     [-1, -1, -1],
   ];
 
@@ -26,14 +26,22 @@ export class SharpenService {
       for (let x = 0; x < width; x++) {
         for (let c = 0; c < channels; c++) {
           let sum = 0;
-          const pixelIndex = (y * width + x) * channels + c;
 
           for (let ky = -offset; ky <= offset; ky++) {
             for (let kx = -offset; kx <= offset; kx++) {
+              const ny = y + ky;
+              const nx = x + kx;
+
+              if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                const kernelVal = this.strongKernel[ky + offset][kx + offset];
+                const pixelIndex = (ny * width + nx) * channels + c;
+                sum += imageData[pixelIndex] * kernelVal;
+              }
             }
           }
 
-          result[pixelIndex] = Math.min(255, Math.max(0, Math.round(sum)));
+          const resultIndex = (y * width + x) * channels + c;
+          result[resultIndex] = Math.min(255, Math.max(0, Math.round(sum)));
         }
       }
     }
@@ -50,20 +58,27 @@ export class SharpenService {
 
       const outputDir = path.join(process.cwd(), 'apps/basic-processing/output_images');
       const outputFilePath = path.join(outputDir, 'sharpened_image.png');
-      if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+
+      if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+      }
 
       const image = sharp(imagePath);
       const metadata = await image.metadata();
       const { width, height, channels = 3 } = metadata;
 
+      if (!width || !height) {
+        throw new Error('Invalid image metadata');
+      }
+
       const imageBuffer = await image.raw().toBuffer();
 
-      const sharpened = this.applyConvolution(imageBuffer, width!, height!, channels);
+      const sharpened = this.applyConvolution(imageBuffer, width, height, channels);
 
       await sharp(sharpened, {
         raw: {
-          width: width!,
-          height: height!,
+          width,
+          height,
           channels,
         },
       })
