@@ -30,7 +30,7 @@ export class GreyscaleService {
         raw: {
           width: result.width,
           height: result.height,
-          channels: 3
+          channels: 1
         }
       })
         .png()
