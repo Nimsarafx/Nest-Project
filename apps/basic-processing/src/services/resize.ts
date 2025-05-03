@@ -7,7 +7,6 @@ import * as path from 'path';
 
 @Injectable()
 export class ResizeService {
-  @MessagePattern({ cmd: 'resize_image' })
   async resize(data: { imagePath: string; width: number; height: number }) {
     try {
       const { imagePath, width, height } = data;

@@ -9,17 +9,17 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
       {
         name: 'BASIC_PROCESSING_SERVICE',
         transport: Transport.TCP,
-        options: { host: 'localhost', port: 4001 },
+        options: { host: '127.0.0.1', port: 4001 },
       },
       {
         name: 'ENHANCEMENT_SERVICE',
         transport: Transport.TCP,
-        options: { host: 'localhost', port: 4002 },
+        options: { host: '127.0.0.1', port: 4002 },
       },
       {
         name: 'FEATURE_DETECTION_SERVICE',
         transport: Transport.TCP,
-        options: { host: 'localhost', port: 4003 },
+        options: { host: '127.0.0.1', port: 4003 },
       },
     ]),
   ],
